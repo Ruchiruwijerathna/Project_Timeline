@@ -6,7 +6,7 @@
 const CONFIG = {
 
   // Paste your Google Sheets CSV URL here (from Step 1 above)
-  SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/YOUR_SHEET_ID/pub?gid=0&single=true&output=csv",
+  SHEET_CSV_URL: "https://docs.google.com/spreadsheets/d/e/2PACX-1vT6ShaEIFadVDKN3jd9kuIwFnN5xNIg5yTPG6LKSEwrJf-ADvLGt1h2XkUup4PPOlkAjWQMHvzIBsZx/pub?gid=1996765743&single=true&output=csv",
 
   // How often to re-fetch data (milliseconds). 300000 = 5 minutes
   REFRESH_INTERVAL_MS: 300000,
