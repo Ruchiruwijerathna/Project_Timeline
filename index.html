@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Prime Land — Project Approval Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="config.js"></script>
+<script src="data.js"></script>
+<style>
+:root{
+  --bg:#0D1117;--bg2:#161B22;--bg3:#21262D;
+  --border:#30363D;--border2:#484F58;
+  --text:#E6EDF3;--text2:#8B949E;--text3:#484F58;
+  --gold:#F0A500;--blue:#2F81F7;--green:#3FB950;
+  --red:#F85149;--orange:#EF9F27;--purple:#A371F7;--teal:#39C5CF;
+  --fn:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --mono:'JetBrains Mono','Fira Code',Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--fn);font-size:14px;line-height:1.5}
+
+/* Loading */
+#lov{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:999;gap:14px}
+#lov.h{display:none}
+.spin{width:34px;height:34px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#lmsg{font-size:13px;color:var(--text2)}
+
+/* Error */
+#ebanner{background:rgba(248,81,73,.1);border-bottom:1px solid rgba(248,81,73,.25);color:var(--red);font-size:12px;padding:8px 24px;display:none;align-items:center;gap:10px}
+#ebanner.v{display:flex}
+#ebanner a{color:var(--red);text-decoration:underline;cursor:pointer}
+
+/* Refresh bar */
+#rbar{background:var(--bg2);border-bottom:1px solid var(--border);font-size:11px;color:var(--text2);padding:3px 20px;display:flex;align-items:center;gap:10px}
+#rtrack{flex:1;height:2px;background:var(--border);border-radius:1px;overflow:hidden}
+#rfill{height:100%;background:var(--gold);border-radius:1px;width:0%;transition:width 1s linear}
+
+/* Header */
+.hdr{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;height:54px}
+.logo{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+.logo span{color:var(--text2);font-weight:400}
+.nav{display:flex;gap:2px}
+.nb{background:none;border:none;color:var(--text2);font:13px var(--fn);padding:6px 11px;border-radius:6px;cursor:pointer}
+.nb:hover{background:var(--bg3);color:var(--text)}
+.nb.on{background:var(--bg3);color:var(--text)}
+.hright{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--text2)}
+.rbtn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);font:12px var(--fn);padding:5px 10px;border-radius:6px;cursor:pointer}
+.rbtn:hover{border-color:var(--gold);color:var(--gold)}
+
+/* Pages */
+.pg{display:none;padding:20px;max-width:1400px;margin:0 auto}
+.pg.on{display:block}
+
+/* KPI row */
+.krow{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:20px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.kg::before{background:var(--gold)}.kb::before{background:var(--blue)}
+.kgr::before{background:var(--green)}.kr::before{background:var(--red)}
+.ko::before{background:var(--orange)}.kp::before{background:var(--purple)}
+.klbl{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.kval{font-size:26px;font-weight:600;line-height:1}
+.ksub{font-size:11px;color:var(--text2);margin-top:4px}
+.kg .kval{color:var(--gold)}.kb .kval{color:var(--blue)}
+.kgr .kval{color:var(--green)}.kr .kval{color:var(--red)}
+.ko .kval{color:var(--orange)}.kp .kval{color:var(--purple)}
+
+/* Grid */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.g31{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px}
+.full{margin-bottom:14px}
+
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.ct{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px}
+.cs{font-size:11px;color:var(--text2);margin-bottom:12px}
+.axis-label{font-size:10px;color:var(--text3);margin-top:3px}
+
+/* Pipeline funnel */
+.flist{display:flex;flex-direction:column;gap:7px}
+.frow{display:flex;align-items:center;gap:8px}
+.fname{font-size:11px;color:var(--text2);width:148px;flex-shrink:0;text-align:right;white-space:nowrap}
+.ftrack{flex:1;height:26px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.ffill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;font-size:11px;font-weight:600;color:rgba(255,255,255,.92);gap:6px;transition:width .5s ease}
+.fmeta{font-size:11px;color:var(--text2);width:68px;flex-shrink:0;text-align:right;white-space:nowrap}
+
+/* Bottleneck bars */
+.bnlist{display:flex;flex-direction:column;gap:9px}
+.bnrow{display:flex;align-items:center;gap:8px}
+.bnname{font-size:11px;color:var(--text2);width:148px;flex-shrink:0;text-align:right}
+.bntrack{flex:1;height:30px;background:var(--bg3);border-radius:4px;overflow:hidden;position:relative}
+.bnfill{height:100%;border-radius:4px;display:flex;align-items:center;padding:0 10px;font-size:12px;font-weight:600;color:#fff;gap:6px;transition:width .5s ease}
+.bnfill .bnn{font-weight:400;opacity:.65;font-size:10px}
+.bnfill .bnn.warn{color:#FFD580;opacity:1}
+.bndays{font-size:11px;color:var(--text2);width:68px;flex-shrink:0;text-align:right;font-family:var(--mono)}
+.low-n-stripe{background-image:repeating-linear-gradient(-45deg,rgba(255,255,255,0) 0px,rgba(255,255,255,0) 4px,rgba(255,255,255,.07) 4px,rgba(255,255,255,.07) 8px)}
+.bnlegend{display:flex;gap:16px;font-size:10px;color:var(--text2);margin-bottom:10px;flex-wrap:wrap}
+.bnlegend span{display:flex;align-items:center;gap:5px}
+.lsq{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+
+/* Stalled table */
+.stbl{width:100%;border-collapse:collapse}
+.stbl th{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;padding:0 8px 7px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap}
+.stbl td{padding:7px 8px;border-bottom:1px solid var(--bg3);font-size:12px;vertical-align:middle}
+.stbl tr:last-child td{border-bottom:none}
+.stbl tr:hover td{background:rgba(255,255,255,.02)}
+.badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;white-space:nowrap;display:inline-block}
+.bc{background:rgba(248,81,73,.14);color:#F85149;border:1px solid rgba(248,81,73,.28)}
+.bw{background:rgba(239,159,39,.14);color:#EF9F27;border:1px solid rgba(239,159,39,.28)}
+.bwt{background:rgba(47,129,247,.14);color:#2F81F7;border:1px solid rgba(47,129,247,.28)}
+.bok{background:rgba(63,185,80,.14);color:#3FB950;border:1px solid rgba(63,185,80,.28)}
+.bst{background:var(--bg3);color:var(--text2);border:1px solid var(--border);font-size:10px}
+.bfl{background:rgba(248,81,73,.1);color:#F85149;border:1px solid rgba(248,81,73,.2)}
+.bda{background:rgba(239,159,39,.1);color:#EF9F27;border:1px solid rgba(239,159,39,.2)}
+
+/* Project table */
+.psearch{background:var(--bg3);border:1px solid var(--border);color:var(--text);font:13px var(--fn);padding:8px 12px;border-radius:7px;width:100%;margin-bottom:10px;outline:none}
+.psearch:focus{border-color:var(--gold)}
+.psearch::placeholder{color:var(--text3)}
+.fltrow{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.fb{background:var(--bg3);border:1px solid var(--border);color:var(--text2);font:12px var(--fn);padding:4px 10px;border-radius:20px;cursor:pointer}
+.fb:hover{border-color:var(--gold);color:var(--gold)}
+.fb.on{background:var(--gold);border-color:var(--gold);color:#000;font-weight:600}
+.ptbl{width:100%;border-collapse:collapse}
+.ptbl th{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;padding:0 8px 8px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+.ptbl th:hover{color:var(--text2)}
+.ptbl th.sa::after{content:' ↑';color:var(--gold)}
+.ptbl th.sd::after{content:' ↓';color:var(--gold)}
+.ptbl td{padding:8px 8px;border-bottom:1px solid var(--bg3);font-size:12px;vertical-align:middle}
+.ptbl tr:last-child td{border-bottom:none}
+.ptbl tr:hover td{background:rgba(255,255,255,.02)}
+.pname{font-weight:500;color:var(--text)}
+.pid{font-family:var(--mono);color:var(--text3);font-size:11px}
+.mono{font-family:var(--mono);font-size:11px}
+.sdot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:5px;flex-shrink:0}
+.pagi{display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--text2)}
+.pbtns{display:flex;gap:4px}
+.pbtn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);font:12px var(--fn);padding:4px 10px;border-radius:4px;cursor:pointer}
+.pbtn:hover{border-color:var(--gold);color:var(--gold)}
+.pbtn:disabled{opacity:.35;cursor:default}
+
+/* Special clearances */
+.cgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.ccard{background:var(--bg3);border-radius:7px;padding:11px 13px}
+.cname{font-size:12px;font-weight:600;color:var(--text);margin-bottom:7px}
+.crow{display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:3px}
+.cv{font-family:var(--mono)}
+
+/* Data note */
+.dnote{font-size:11px;color:var(--text3);margin-top:7px;font-style:italic}
+
+/* Chart legend */
+.leg{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.li{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2)}
+.lsq2{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.ldo{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+@media(max-width:1100px){.krow{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:768px){.g2,.g31{grid-template-columns:1fr}.krow{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<div id="lov"><div class="spin"></div><div id="lmsg">Connecting to Google Sheets…</div></div>
+<div id="ebanner"><span id="emsg"></span><a onclick="manualRefresh()">↻ Retry</a></div>
+
+<div id="rbar">
+  <span id="rcd">Next refresh in 5:00</span>
+  <div id="rtrack"><div id="rfill"></div></div>
+  <span id="rtime" style="white-space:nowrap;font-family:var(--mono)">—</span>
+</div>
+
+<header class="hdr">
+  <div style="display:flex;align-items:center;gap:14px">
+    <div class="logo">Prime Land <span>/ Approval Tracker</span></div>
+    <nav class="nav">
+      <button class="nb on" onclick="showPg('overview',this)">Overview</button>
+      <button class="nb" onclick="showPg('bottleneck',this)">Bottlenecks</button>
+      <button class="nb" onclick="showPg('projects',this)">All Projects</button>
+      <button class="nb" onclick="showPg('special',this)">Clearances</button>
+    </nav>
+  </div>
+  <div class="hright">
+    <span>Data: <span id="ddate" style="font-family:var(--mono)">—</span></span>
+    <button class="rbtn" onclick="manualRefresh()">↻ Refresh now</button>
+  </div>
+</header>
+
+<!-- ══ PAGE: OVERVIEW ══════════════════════════════════════ -->
+<div class="pg on" id="pg-overview">
+
+  <div class="krow" id="krow"></div>
+
+  <!-- Row 1: Pipeline + Age -->
+  <div class="g31">
+    <div class="card">
+      <div class="ct">Approval pipeline — project count &amp; lot volume</div>
+      <div class="cs">Each bar = projects at that stage · number right = lots · widest bar = most projects</div>
+      <div class="flist" id="pipeline-funnel"></div>
+    </div>
+    <div class="card">
+      <div class="ct">Project age profile</div>
+      <div class="cs">X = years since Agreement/Deed · Y = number of projects</div>
+      <div style="position:relative;height:195px"><canvas id="ageChart"></canvas></div>
+      <div class="axis-label" style="display:flex;justify-content:space-between"><span>← Newer</span><span>Older →</span></div>
+    </div>
+  </div>
+
+  <!-- Row 2: Intake vs COC trend + LA breakdown -->
+  <div class="g2">
+    <div class="card">
+      <div class="ct">Projects started vs COC completed — by year</div>
+      <div class="cs">X = year · Y = project count · bars show intake (started) vs output (COC) each year</div>
+      <div style="position:relative;height:210px"><canvas id="yearlyChart"></canvas></div>
+      <div class="dnote">Started = year Agreement/Deed signed. Completed = year COC issued.</div>
+    </div>
+    <div class="card">
+      <div class="ct">Local authority — projects &amp; completion</div>
+      <div class="cs">X = project count · Y = authority · green = COC done</div>
+      <div style="position:relative;height:230px"><canvas id="laChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 3: Lots by stage + Lot size vs cycle -->
+  <div class="g2">
+    <div class="card">
+      <div class="ct">Lot volume by pipeline stage</div>
+      <div class="cs">X = stage · Y = total lots currently at that stage · shows where land value sits</div>
+      <div style="position:relative;height:200px"><canvas id="lotsChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="ct">Does lot size affect cycle time?</div>
+      <div class="cs">X = no. of lots in project · Y = days from Agreement/Deed to BOD Approved · each dot = one project</div>
+      <div class="leg">
+        <span class="li"><span class="ldo" style="background:#3FB950"></span>COC Complete</span>
+        <span class="li"><span class="ldo" style="background:#2F81F7"></span>BOD Approved</span>
+        <span class="li"><span class="ldo" style="background:#EF9F27"></span>In Progress</span>
+      </div>
+      <div style="position:relative;height:165px"><canvas id="scatterChart"></canvas></div>
+      <div class="dnote">40 projects with both lot count &amp; cycle time data. No strong size-time relationship visible — delays are driven by stage, not project size.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ PAGE: BOTTLENECKS ═══════════════════════════════════ -->
+<div class="pg" id="pg-bottleneck">
+
+  <div class="g2">
+    <div class="card">
+      <div class="ct">How long does each approval stage take?</div>
+      <div class="cs">X = median calendar days from Applied to Approved · Y = approval stage · longer bar = bigger bottleneck</div>
+      <div class="bnlegend">
+        <span><span class="lsq" style="background:#F85149"></span>Critical ≥100d median</span>
+        <span><span class="lsq" style="background:#EF9F27"></span>Moderate 40–99d</span>
+        <span><span class="lsq" style="background:#3FB950"></span>Fast &lt;40d</span>
+        <span><span class="lsq low-n-stripe" style="background:#444;width:18px;border:1px solid #555"></span>Hatched = n&lt;10 (low data — treat with caution)</span>
+      </div>
+      <div class="bnlist" id="bn-bars"></div>
+      <div class="axis-label" style="display:flex;justify-content:space-between;margin-top:8px"><span>← Faster</span><span>Slower →</span></div>
+      <div class="dnote">BOD Survey→Approve is the dominant bottleneck with 59 data points (reliable). Other stages have fewer records — fill Applied dates going forward to improve accuracy.</div>
+    </div>
+
+    <div class="card">
+      <div class="ct">Stalled projects — days idle, stage &amp; lots at risk</div>
+      <div class="cs">Non-COC projects with no activity in 180+ days · sorted by severity · check if COC date simply not entered before escalating</div>
+      <div style="max-height:440px;overflow-y:auto">
+        <table class="stbl" id="stall-tbl"></table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card full">
+    <div class="ct">Projects flagged for senior review</div>
+    <div class="cs">Unusually long cycle times (2σ above mean = &gt;375d) · missing critical dates · verify with land records before board presentation</div>
+    <table class="ptbl" style="margin-top:8px">
+      <thead><tr><th>ID</th><th>Project</th><th>LA</th><th>Flag</th><th>Detail</th><th>Action</th></tr></thead>
+      <tbody id="flag-tbody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- ══ PAGE: ALL PROJECTS ══════════════════════════════════ -->
+<div class="pg" id="pg-projects">
+  <div class="card full">
+    <input class="psearch" id="psearch" placeholder="Search project name or local authority…" oninput="filterTbl()">
+    <div class="fltrow" id="stg-filters"></div>
+    <div style="overflow-x:auto">
+      <table class="ptbl" id="proj-tbl">
+        <thead><tr>
+          <th onclick="sortTbl('id')">ID</th>
+          <th onclick="sortTbl('name')">Project</th>
+          <th onclick="sortTbl('la')">Local Authority</th>
+          <th onclick="sortTbl('lots')">Lots</th>
+          <th onclick="sortTbl('stage_num')">Stage</th>
+          <th onclick="sortTbl('days_inactive')">Idle days</th>
+          <th onclick="sortTbl('cycle_days')">Cycle (d)</th>
+          <th>Agreement</th>
+          <th>Deed</th>
+          <th>BOD Approved</th>
+          <th>COC</th>
+          <th>Data needed</th>
+        </tr></thead>
+        <tbody id="proj-tbody"></tbody>
+      </table>
+    </div>
+    <div class="pagi">
+      <span id="pagi-info"></span>
+      <div class="pbtns">
+        <button class="pbtn" id="btn-prev" onclick="changePg(-1)">← Prev</button>
+        <span id="pagi-num" style="padding:4px 8px;color:var(--text2)"></span>
+        <button class="pbtn" id="btn-next" onclick="changePg(1)">Next →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE: CLEARANCES ════════════════════════════════════ -->
+<div class="pg" id="pg-special">
+  <div class="card full">
+    <div class="ct">Special clearances — site-specific approvals</div>
+    <div class="cs" style="margin-bottom:14px">Required only for certain site conditions. Tracked separately — sparse data is expected and does not affect main pipeline metrics.</div>
+    <div class="cgrid" id="clear-grid"></div>
+  </div>
+  <div class="card full" style="margin-top:14px">
+    <div class="ct">Clearance detail by project</div>
+    <div style="overflow-x:auto;margin-top:8px">
+      <table class="ptbl" id="spec-tbl">
+        <thead><tr><th>ID</th><th>Project</th><th>NBRO</th><th>Agrarian</th><th>Irrigation</th><th>Archaeology</th><th>Forest</th><th>CEA</th><th>NRMC</th><th>Tea/Rubber</th><th>Civil Aviation</th></tr></thead>
+        <tbody id="spec-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Chart.js defaults ──────────────────────────────────────
+Chart.defaults.color = '#8B949E';
+Chart.defaults.font.family = 'Inter, sans-serif';
+Chart.defaults.font.size = 11;
+const CDG = 'rgba(255,255,255,0.055)';
+
+let D = null;
+const charts = {};
+let filtProjs = [], curPage = 1;
+const PG_SZ = 20;
+let sortKey = 'id', sortAsc = true, stageFilter = 'all';
+let refreshTimer = null, refreshStart = null;
+
+// ── Utils ─────────────────────────────────────────────────
+const fmt = n => (n||0).toLocaleString();
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+
+// ── Loading / error ────────────────────────────────────────
+const LOV = document.getElementById('lov');
+const LMSG = document.getElementById('lmsg');
+const EB = document.getElementById('ebanner');
+function showLoading(m){ LMSG.textContent=m; LOV.classList.remove('h'); }
+function hideLoading(){ LOV.classList.add('h'); }
+function showErr(m){ document.getElementById('emsg').textContent=m; EB.classList.add('v'); }
+function hideErr(){ EB.classList.remove('v'); }
+
+// ── Refresh countdown ──────────────────────────────────────
+function startCountdown(){
+  refreshStart = Date.now();
+  const iv = CONFIG.REFRESH_MS;
+  const tick = () => {
+    const el = Date.now()-refreshStart;
+    const rem = Math.max(0,iv-el);
+    const pct = Math.min(100,Math.round(el/iv*100));
+    const m = Math.floor(rem/60000), s = Math.floor((rem%60000)/1000);
+    document.getElementById('rcd').textContent = `Next refresh in ${m}:${String(s).padStart(2,'0')}`;
+    document.getElementById('rfill').style.width = pct+'%';
+    if(rem>0) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+// ── Data load ─────────────────────────────────────────────
+async function loadData(showUI=true){
+  if(showUI) showLoading('Fetching from Google Sheets…');
+  hideErr();
+  try{
+    D = await loadDashboardData();
+    hideLoading();
+    document.getElementById('ddate').textContent = D.generated;
+    document.getElementById('rtime').textContent = 'Loaded '+new Date().toLocaleTimeString();
+    renderAll();
+    startCountdown();
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(()=>loadData(false), CONFIG.REFRESH_MS);
+  } catch(err){
+    hideLoading();
+    if(err.message==='CONFIG_URL_NOT_SET'){
+      showErr('Google Sheets URL not configured — open config.js and paste your published CSV URL into SHEET_CSV_URL.');
+    } else {
+      showErr('Could not load data: '+err.message);
+    }
+  }
+}
+function manualRefresh(){ clearTimeout(refreshTimer); loadData(true); }
+
+// ── Render all ────────────────────────────────────────────
+function renderAll(){
+  renderKPIs(); renderFunnel(); renderCharts();
+  renderBottleneck(); renderStallTable(); renderFlagTable();
+  renderStageFilters(); renderSpecial();
+  filtProjs = [...D.projects]; sortProjs(); renderProjTable();
+}
+
+// ── KPIs ──────────────────────────────────────────────────
+function renderKPIs(){
+  const k = D.kpis;
+  const compPct = Math.round(k.completed/k.total*100);
+  const lotPct  = k.total_lots>0 ? Math.round(k.coc_lots/k.total_lots*100) : 0;
+  const stalledLotsPct = k.total_lots>0 ? Math.round(k.stalled_lots/k.total_lots*100) : 0;
+  document.getElementById('krow').innerHTML = `
+    <div class="kpi kg">
+      <div class="klbl">Total Projects</div>
+      <div class="kval">${k.total}</div>
+      <div class="ksub">${k.completed} done · ${k.in_progress} in progress</div>
+    </div>
+    <div class="kpi kgr">
+      <div class="klbl">COC Complete</div>
+      <div class="kval">${k.completed}</div>
+      <div class="ksub">${compPct}% of all projects</div>
+    </div>
+    <div class="kpi kb">
+      <div class="klbl">Total Lots in System</div>
+      <div class="kval">${fmt(k.total_lots)}</div>
+      <div class="ksub">${fmt(k.coc_lots)} approved (${lotPct}%) · ${fmt(k.pipeline_lots)} in pipeline</div>
+    </div>
+    <div class="kpi kr">
+      <div class="klbl">Stalled — Lots at Risk</div>
+      <div class="kval">${fmt(k.stalled_lots)}</div>
+      <div class="ksub">${k.stalled_count} projects idle 180d+ · ${stalledLotsPct}% of all lots</div>
+    </div>
+    <div class="kpi ko">
+      <div class="klbl">Median Cycle Time</div>
+      <div class="kval">${k.median_cycle}d</div>
+      <div class="ksub">Agreement/Deed → BOD Approved</div>
+    </div>
+    <div class="kpi kp">
+      <div class="klbl">BOD Bottleneck</div>
+      <div class="kval">${k.bod_median}d</div>
+      <div class="ksub">Median BOD Survey → Approve (n=59)</div>
+    </div>`;
+}
+
+// ── Pipeline funnel ────────────────────────────────────────
+function renderFunnel(){
+  const maxC = Math.max(...D.pipeline.map(p=>p.count), 1);
+  document.getElementById('pipeline-funnel').innerHTML =
+    D.pipeline.slice().reverse().map(p=>{
+      const pct = Math.max(Math.round(p.count/maxC*100), 5);
+      const lotsStr = p.lots > 0 ? `${fmt(p.lots)} lots` : '—';
+      return `<div class="frow">
+        <div class="fname">${esc(p.stage)}</div>
+        <div class="ftrack">
+          <div class="ffill" style="width:${pct}%;background:${p.color}">
+            ${p.count} project${p.count!==1?'s':''}
+          </div>
+        </div>
+        <div class="fmeta">${lotsStr}</div>
+      </div>`;
+    }).join('');
+}
+
+// ── Charts ────────────────────────────────────────────────
+function mk(id, cfg){
+  if(charts[id]){ charts[id].destroy(); delete charts[id]; }
+  const c = document.getElementById(id);
+  if(c) charts[id] = new Chart(c, cfg);
+}
+
+function renderCharts(){
+  // Age distribution
+  mk('ageChart',{
+    type:'bar',
+    data:{
+      labels: Object.keys(D.age_buckets),
+      datasets:[{
+        data: Object.values(D.age_buckets),
+        backgroundColor:'#2F81F7', borderRadius:4, borderWidth:0
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw} projects`}}},
+      scales:{
+        x:{grid:{color:CDG},ticks:{color:'#8B949E'},
+           title:{display:true,text:'Project age (years)',color:'#484F58',font:{size:10}}},
+        y:{grid:{color:CDG},ticks:{color:'#8B949E',stepSize:5},
+           title:{display:true,text:'No. of projects',color:'#484F58',font:{size:10}}}
+      }}
+  });
+
+  // Yearly intake vs COC
+  const yKeys = Object.keys(D.yearly);
+  const yStarted = yKeys.map(y=>D.yearly[y].started);
+  const yCOC     = yKeys.map(y=>D.yearly[y].coc);
+  mk('yearlyChart',{
+    type:'bar',
+    data:{
+      labels: yKeys,
+      datasets:[
+        {label:'Projects started',data:yStarted,backgroundColor:'#2F81F7',borderRadius:3,borderWidth:0},
+        {label:'COC completed',   data:yCOC,    backgroundColor:'#3FB950',borderRadius:3,borderWidth:0}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:11},color:'#8B949E'}}},
+      scales:{
+        x:{grid:{color:CDG},ticks:{color:'#8B949E'},
+           title:{display:true,text:'Year',color:'#484F58',font:{size:10}}},
+        y:{grid:{color:CDG},ticks:{color:'#8B949E',stepSize:2},
+           title:{display:true,text:'No. of projects',color:'#484F58',font:{size:10}}}
+      }}
+  });
+
+  // LA chart — projects + completed as stacked
+  const laTop = D.la_data.slice(0,12);
+  const laLabels = laTop.map(r=>r.local_authority.replace(/_/g,' '));
+  mk('laChart',{
+    type:'bar',
+    data:{
+      labels: laLabels,
+      datasets:[
+        {label:'Total',   data:laTop.map(r=>r.projects),  backgroundColor:'#2F81F7CC',borderRadius:2,borderWidth:0},
+        {label:'COC done',data:laTop.map(r=>r.completed), backgroundColor:'#3FB950',  borderRadius:2,borderWidth:0}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{legend:{display:true,position:'bottom',labels:{boxWidth:10,font:{size:10},color:'#8B949E'}}},
+      scales:{
+        x:{grid:{color:CDG},ticks:{color:'#8B949E'},
+           title:{display:true,text:'No. of projects',color:'#484F58',font:{size:10}}},
+        y:{grid:{display:false},ticks:{color:'#8B949E',font:{size:10}}}
+      }}
+  });
+
+  // Lots by stage
+  mk('lotsChart',{
+    type:'bar',
+    data:{
+      labels: D.pipeline.map(p=>p.stage),
+      datasets:[{
+        data: D.pipeline.map(p=>p.lots),
+        backgroundColor: D.pipeline.map(p=>p.color),
+        borderRadius:4, borderWidth:0
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${fmt(c.raw)} lots`}}},
+      scales:{
+        x:{grid:{color:CDG},ticks:{color:'#8B949E',maxRotation:30,font:{size:10}},
+           title:{display:true,text:'Approval stage',color:'#484F58',font:{size:10}}},
+        y:{grid:{color:CDG},ticks:{color:'#8B949E'},
+           title:{display:true,text:'Total lots',color:'#484F58',font:{size:10}}}
+      }}
+  });
+
+  // Scatter: lots vs cycle time
+  const SC = {'COC Complete':'#3FB950BB','BOD Approved':'#2F81F7BB'};
+  const spts = D.scatter.filter(p=>p.x&&p.y);
+  mk('scatterChart',{
+    type:'scatter',
+    data:{datasets:[{
+      data: spts.map(p=>({x:p.x,y:p.y,name:p.name,stage:p.stage})),
+      backgroundColor: spts.map(p=>SC[p.stage]||'#EF9F27BB'),
+      pointRadius:5,pointHoverRadius:7,borderWidth:0
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:d=>`${esc(d.raw.name)}: ${d.raw.x} lots, ${d.raw.y} days`}}},
+      scales:{
+        x:{grid:{color:CDG},ticks:{color:'#8B949E'},
+           title:{display:true,text:'No. of lots in project',color:'#484F58',font:{size:10}}},
+        y:{grid:{color:CDG},ticks:{color:'#8B949E'},
+           title:{display:true,text:'Cycle days (Agreement/Deed → BOD)',color:'#484F58',font:{size:10}}}
+      }}
+  });
+}
+
+// ── Bottleneck bars ────────────────────────────────────────
+function renderBottleneck(){
+  const ss = D.stage_stats;
+  const maxM = Math.max(...Object.values(ss).map(s=>s.median), 1);
+  document.getElementById('bn-bars').innerHTML =
+    Object.entries(ss).sort((a,b)=>b[1].median-a[1].median).map(([label,s])=>{
+      const pct = Math.max(Math.round(s.median/maxM*100), 6);
+      const col = s.median>=100?'#F85149':s.median>=40?'#EF9F27':'#3FB950';
+      const meanNote = Math.abs(s.mean-s.median)>25 ? ` · avg ${s.mean}d` : '';
+      const lowN = s.low_n;
+      const nBadge = lowN
+        ? `<span class="bnn warn">n=${s.n} ⚠ low data</span>`
+        : `<span class="bnn">n=${s.n}</span>`;
+      return `<div class="bnrow">
+        <div class="bnname">${esc(label)}</div>
+        <div class="bntrack">
+          <div class="bnfill${lowN?' low-n-stripe':''}" style="width:${pct}%;background:${col}">
+            ${s.median}d median ${nBadge}
+          </div>
+        </div>
+        <div class="bndays">max ${s.max}d${meanNote}</div>
+      </div>`;
+    }).join('');
+}
+
+// ── Stalled table (days + stage + lots) ───────────────────
+function renderStallTable(){
+  const rows = D.stalled_list;
+  const badgeClass = c=>c==='critical'?'bc':c==='warning'?'bw':'bwt';
+  document.getElementById('stall-tbl').innerHTML =
+    `<thead><tr>
+      <th>ID</th><th>Project</th><th>Stage</th>
+      <th>Days idle</th><th>Severity</th><th>Lots at risk</th>
+    </tr></thead>
+    <tbody>${rows.map(p=>`<tr>
+      <td class="pid">${p.id}</td>
+      <td class="pname" style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</td>
+      <td><span class="badge bst">${esc(p.stage)}</span></td>
+      <td class="mono" style="color:${p.days_inactive>1800?'#F85149':p.days_inactive>730?'#EF9F27':'#2F81F7'}">${fmt(p.days_inactive)}d</td>
+      <td><span class="badge ${badgeClass(p.stall_cat)}">${p.stall_cat.charAt(0).toUpperCase()+p.stall_cat.slice(1)}</span></td>
+      <td class="mono">${p.lots>0?p.lots:'?'}</td>
+    </tr>`).join('')}</tbody>`;
+}
+
+// ── Flag table ─────────────────────────────────────────────
+function renderFlagTable(){
+  const cycs = D.projects.map(p=>p.cycle_days).filter(Boolean);
+  const mean = cycs.reduce((s,v)=>s+v,0)/(cycs.length||1);
+  const flags = D.projects.filter(p=>p.flag&&p.flag!=='');
+  document.getElementById('flag-tbody').innerHTML = flags.map(p=>{
+    if(p.flag==='long_cycle'){
+      const ex = p.cycle_days?Math.round(p.cycle_days-mean):0;
+      return `<tr>
+        <td class="pid">${p.id}</td><td class="pname">${esc(p.name)}</td>
+        <td style="color:var(--text2);font-size:11px">${esc(p.la)}</td>
+        <td><span class="badge bfl">Long cycle</span></td>
+        <td class="mono" style="color:#F85149">${p.cycle_days}d · mean+${ex}d</td>
+        <td style="color:var(--text2);font-size:11px">Verify — check for LA delays, scope change, or legal hold</td></tr>`;
+    }
+    if(p.flag==='stalled'||p.flag==='inactive'){
+      return `<tr>
+        <td class="pid">${p.id}</td><td class="pname">${esc(p.name)}</td>
+        <td style="color:var(--text2);font-size:11px">${esc(p.la)}</td>
+        <td><span class="badge bfl">Stalled</span></td>
+        <td class="mono" style="color:#EF9F27">${fmt(p.days_inactive)}d idle · ${esc(p.stage)}</td>
+        <td style="color:var(--text2);font-size:11px">Confirm COC date not missing; if genuine, escalate</td></tr>`;
+    }
+    return `<tr>
+      <td class="pid">${p.id}</td><td class="pname">${esc(p.name)}</td>
+      <td style="color:var(--text2);font-size:11px">${esc(p.la)}</td>
+      <td><span class="badge bda">Data gap</span></td>
+      <td class="mono" style="color:#EF9F27">${(p.data_needed||[]).join(', ')}</td>
+      <td style="color:var(--text2);font-size:11px">Fill from land purchase records before board presentation</td></tr>`;
+  }).join('') || `<tr><td colspan="6" style="color:var(--text3);padding:12px">No flagged projects</td></tr>`;
+}
+
+// ── Project table ──────────────────────────────────────────
+function renderStageFilters(){
+  const stages = ['all',...CONFIG.STAGE_ORDER];
+  document.getElementById('stg-filters').innerHTML = stages.map(s=>
+    `<button class="fb${s==='all'?' on':''}" onclick="setStgFilter('${s}',this)">${s==='all'?'All stages':s}</button>`
+  ).join('');
+}
+function setStgFilter(s,el){
+  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on'); stageFilter=s; curPage=1; filterTbl();
+}
+function filterTbl(){
+  const q=(document.getElementById('psearch').value||'').toLowerCase();
+  filtProjs=D.projects.filter(p=>{
+    const nm=(p.name||'').toLowerCase(), la=(p.la||'').toLowerCase();
+    return (!q||(nm.includes(q)||la.includes(q)))&&(stageFilter==='all'||p.stage===stageFilter);
+  });
+  sortProjs(); renderProjTable();
+}
+function sortTbl(key){
+  if(sortKey===key) sortAsc=!sortAsc; else{sortKey=key;sortAsc=true;}
+  const ths=document.querySelectorAll('#proj-tbl th');
+  ths.forEach(t=>{t.classList.remove('sa','sd');});
+  const keyMap={'id':0,'name':1,'la':2,'lots':3,'stage_num':4,'days_inactive':5,'cycle_days':6};
+  if(keyMap[key]!==undefined) ths[keyMap[key]].classList.add(sortAsc?'sa':'sd');
+  sortProjs(); renderProjTable();
+}
+function sortProjs(){
+  filtProjs.sort((a,b)=>{
+    let av=a[sortKey]??null, bv=b[sortKey]??null;
+    if(av===null) av=sortAsc?Infinity:-Infinity;
+    if(bv===null) bv=sortAsc?Infinity:-Infinity;
+    if(typeof av==='string'&&typeof bv==='string') return sortAsc?av.localeCompare(bv):bv.localeCompare(av);
+    return sortAsc?av-bv:bv-av;
+  });
+}
+function renderProjTable(){
+  const start=(curPage-1)*PG_SZ;
+  const slice=filtProjs.slice(start,start+PG_SZ);
+  document.getElementById('proj-tbody').innerHTML=slice.map(p=>{
+    const dot=`<span class="sdot" style="background:${CONFIG.STAGE_COLORS[p.stage]||'#888'}"></span>`;
+    const idleCol=p.stage!=='COC Complete'&&p.days_inactive>365?'#F85149':p.days_inactive>180?'#EF9F27':'#8B949E';
+    const cycCol=p.cycle_days&&p.cycle_days>375?'#F85149':p.cycle_days&&p.cycle_days>200?'#EF9F27':'#8B949E';
+    const inactiveBadge=p.stage!=='COC Complete'&&p.stall_cat!=='ok'?`<span class="badge ${p.stall_cat==='critical'?'bc':p.stall_cat==='warning'?'bw':'bwt'}" style="font-size:9px;margin-left:4px">${p.stall_cat}</span>`:'';
+    const dcell=p.data_needed&&p.data_needed.length?`<span style="font-size:10px;color:#EF9F27">⚠ ${esc(p.data_needed.join(', '))}</span>`:`<span style="color:var(--text3)">—</span>`;
+    return `<tr>
+      <td class="pid">${p.id}</td>
+      <td class="pname">${esc(p.name)}</td>
+      <td style="color:var(--text2);font-size:11px">${esc((p.la||'').replace(/_/g,' '))}</td>
+      <td class="mono">${p.lots||'—'}</td>
+      <td>${dot}${esc(p.stage)}${inactiveBadge}</td>
+      <td class="mono" style="color:${idleCol}">${p.days_inactive?fmt(p.days_inactive)+'d':'—'}</td>
+      <td class="mono" style="color:${cycCol}">${p.cycle_days||'—'}</td>
+      <td class="mono">${esc(p.agreement||'—')}</td>
+      <td class="mono">${esc(p.deed||'—')}</td>
+      <td class="mono">${esc(p.bod||'—')}</td>
+      <td class="mono">${esc(p.coc||'—')}</td>
+      <td>${dcell}</td>
+    </tr>`;
+  }).join('');
+  const total=filtProjs.length, pages=Math.ceil(total/PG_SZ)||1;
+  document.getElementById('pagi-info').textContent=`Showing ${start+1}–${Math.min(start+PG_SZ,total)} of ${total}`;
+  document.getElementById('pagi-num').textContent=`Page ${curPage} of ${pages}`;
+  document.getElementById('btn-prev').disabled=curPage<=1;
+  document.getElementById('btn-next').disabled=curPage>=pages;
+}
+function changePg(d){ curPage=Math.max(1,Math.min(Math.ceil(filtProjs.length/PG_SZ),curPage+d)); renderProjTable(); }
+
+// ── Special clearances ─────────────────────────────────────
+function renderSpecial(){
+  document.getElementById('clear-grid').innerHTML=D.clearances.map(c=>`
+    <div class="ccard">
+      <div class="cname">${esc(c.name)}</div>
+      <div class="crow"><span>Applied</span><span class="cv">${c.applied}</span></div>
+      <div class="crow"><span>Approved</span><span class="cv" style="color:#3FB950">${c.approved}</span></div>
+      <div class="crow"><span>Pending</span><span class="cv" style="color:${c.pending>0?'#EF9F27':'#3FB950'}">${c.pending}</span></div>
+    </div>`).join('');
+
+  const cols = ['NBRO','Agrarian','Irrigation','Archaeology','Forest','CEA','NRMC','Tea/Rubber','Civil Aviation'];
+  const fmtCell = v => v==='approved'
+    ? `<span style="color:#3FB950">✓ Approved</span>`
+    : v==='applied'
+    ? `<span style="color:#EF9F27">Pending</span>`
+    : `<span style="color:var(--text3)">—</span>`;
+
+  document.getElementById('spec-tbody').innerHTML = D.special_projs.map(p=>`<tr>
+    <td class="pid">${p.id}</td>
+    <td class="pname">${esc(p.name)}</td>
+    ${cols.map(c=>`<td>${fmtCell(p[c]||'')}</td>`).join('')}
+  </tr>`).join('') || `<tr><td colspan="11" style="color:var(--text3);padding:12px">No special clearances on record</td></tr>`;
+}
+
+// ── Page nav ──────────────────────────────────────────────
+function showPg(id,btn){
+  document.querySelectorAll('.pg').forEach(p=>p.classList.remove('on'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('on'));
+  document.getElementById('pg-'+id).classList.add('on');
+  btn.classList.add('on');
+}
+
+// ── Boot ──────────────────────────────────────────────────
+loadData(true);
+</script>
+</body>
+</html>
